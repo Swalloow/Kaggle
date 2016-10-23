@@ -1,2 +1,2 @@
-# MachineLearning
-Personal ML Study repo
+# Kaggle Competition
+Codes for Kaggle competitions
