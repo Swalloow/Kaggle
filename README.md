@@ -1,2 +1,2 @@
 # Kaggle Competition
-Codes for Kaggle competitions
+Jupyter Notebooks for Kaggle competitions
