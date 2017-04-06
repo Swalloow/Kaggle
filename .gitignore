@@ -91,3 +91,4 @@ ENV/
 # Data Folder
 data/
 output/
+*.csv
