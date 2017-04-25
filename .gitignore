@@ -93,3 +93,4 @@ data/
 output/
 *.csv
 *.p
+*.ini
