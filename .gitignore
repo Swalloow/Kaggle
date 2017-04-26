@@ -91,6 +91,8 @@ ENV/
 # Data Folder
 data/
 output/
+*.zip
+*.tar
 *.csv
 *.p
 *.ini
