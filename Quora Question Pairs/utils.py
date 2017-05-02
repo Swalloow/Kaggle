@@ -1,3 +1,6 @@
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import pairwise_distances
+from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk import pos_tag
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
@@ -108,3 +111,53 @@ def preprocessing(df):
     df['question1'] = df['question1'].apply(lambda x: text_cleaning(x))
     df['question2'] = df['question2'].apply(lambda x: text_cleaning(x))
     return df
+
+
+# Make features
+def make_features(df, name):
+    try:
+        print("Preprocessing...")
+        df['question1'] = df['question1'].fillna('')
+        df['question2'] = df['question2'].fillna('')
+        df = parallelize_dataframe(df, preprocessing)
+
+        print("Make length feature...")
+        df['len_q1'] = df['question1'].apply(lambda x: len(str(x)))
+        df['len_q2'] = df['question2'].apply(lambda x: len(str(x)))
+
+        df['len_word_q1'] = df['question1'].apply(lambda x: len(str(x).split()))
+        df['len_word_q2'] = df['question2'].apply(lambda x: len(str(x).split()))
+        df['len_word_q2'] = df['len_word_q2'].fillna(0)
+
+        df['avg_world_len1'] = df['len_q1'] / df['len_word_q1']
+        df['avg_world_len2'] = df['len_q2'] / df['len_word_q2']
+        df['diff_avg_word'] = df['avg_world_len1'] - df['avg_world_len2']
+
+        print("Make TfidfVector2...")
+        vectorizer = TfidfVectorizer(lowercase=False, ngram_range=(1,2))
+        vectorizer.fit(df['question1'].append(df['question2']))
+
+        df['q1_vect2'] = list(vectorizer.transform(df['question1']))
+        df['q2_vect2'] = list(vectorizer.transform(df['question2']))
+
+        print("Make TfidfVector1...")
+        vectorizer = TfidfVectorizer(lowercase=False, ngram_range=(1,2), max_features=10000, max_df=0.5, min_df=2, use_idf=True)
+        vectorizer.fit(df['question1'].append(df['question2']))
+
+        print("Transform to vector...")
+        df['q1_vect'] = list(vectorizer.transform(df['question1']))
+        df['q2_vect'] = list(vectorizer.transform(df['question2']))
+
+        print("Make cosine similarity...")
+        df['tf_similarity'] = df.apply(cosine_similarity(df['q1_vect'], df['q2_vect'])[0], axis=1)['id']
+        df['tf_similarity2'] = df.apply(cosine_similarity(df['q1_vect2'], df['q2_vect2'])[0], axis=1)['id']
+    
+    except:
+        print("Error!")
+        df.to_pickle('input/'+name+'.p')
+        return df
+    
+    print("Save as pickle...")
+    df.to_pickle('input/'+name+'.p')
+    return df
+    
