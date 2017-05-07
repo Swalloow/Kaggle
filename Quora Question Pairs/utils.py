@@ -107,6 +107,25 @@ def text_cleaning(text, remove_stop_words=True, stem_words=True):
     return(text)
 
 
+# Word matching
+def word_match_share(row):
+    q1words = {}
+    q2words = {}
+    stops = set(stopwords.words("english"))
+    for word in str(row['question1']).lower().split():
+        if word not in stops:
+            q1words[word] = 1
+    for word in str(row['question2']).lower().split():
+        if word not in stops:
+            q2words[word] = 1
+    if len(q1words) == 0 or len(q2words) == 0:
+        return 0
+    shared_words_in_q1 = [w for w in q1words.keys() if w in q2words]
+    shared_words_in_q2 = [w for w in q2words.keys() if w in q1words]
+    R = (len(shared_words_in_q1) + len(shared_words_in_q2))/(len(q1words) + len(q2words))
+    return R
+
+
 # Data preprocessing
 def preprocessing_test(df):
     question1 = df['question1'].apply(lambda x: text_cleaning(str(x)))
