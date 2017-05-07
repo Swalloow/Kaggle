@@ -24,6 +24,7 @@ def parallelize_dataframe(df, func):
     pool.join()
     return df
 
+
 # 10k -> 10000
 def substitute_thousands(text):
     matches = re.finditer(r'[0-9]+(?P<thousands>\s{0,2}k\b)', text, flags=re.I)
@@ -45,7 +46,7 @@ def eng_pos_tagger(text):
 
 
 # remove stop words, stemming words
-def text_cleaning(text, remove_stop_words=True, stem_words=False):
+def text_cleaning(text, remove_stop_words=True, stem_words=True):
     # Clean the text with the option to remove stop_words and to stem words.
     # Clean the text
     text = text.lower()
@@ -107,57 +108,47 @@ def text_cleaning(text, remove_stop_words=True, stem_words=False):
 
 
 # Data preprocessing
-def preprocessing(df):
-    df['question1'] = df['question1'].apply(lambda x: text_cleaning(x))
-    df['question2'] = df['question2'].apply(lambda x: text_cleaning(x))
-    return df
+def preprocessing_test(df):
+    question1 = df['question1'].apply(lambda x: text_cleaning(str(x)))
+    question2 = df['question2'].apply(lambda x: text_cleaning(str(x)))
+    return pd.DataFrame({'question1': question1, 'question2': question2})
 
 
 # Make features
-def make_features(df, name):
-    try:
-        print("Preprocessing...")
-        df['question1'] = df['question1'].fillna('')
-        df['question2'] = df['question2'].fillna('')
-        df = parallelize_dataframe(df, preprocessing)
-
-        print("Make length feature...")
-        df['len_q1'] = df['question1'].apply(lambda x: len(str(x)))
-        df['len_q2'] = df['question2'].apply(lambda x: len(str(x)))
-
-        df['len_word_q1'] = df['question1'].apply(lambda x: len(str(x).split()))
-        df['len_word_q2'] = df['question2'].apply(lambda x: len(str(x).split()))
-        df['len_word_q2'] = df['len_word_q2'].fillna(0)
-
-        df['avg_world_len1'] = df['len_q1'] / df['len_word_q1']
-        df['avg_world_len2'] = df['len_q2'] / df['len_word_q2']
-        df['diff_avg_word'] = df['avg_world_len1'] - df['avg_world_len2']
-
-        print("Make TfidfVector2...")
-        vectorizer = TfidfVectorizer(lowercase=False, ngram_range=(1,2))
-        vectorizer.fit(df['question1'].append(df['question2']))
-
-        df['q1_vect2'] = list(vectorizer.transform(df['question1']))
-        df['q2_vect2'] = list(vectorizer.transform(df['question2']))
-
-        print("Make TfidfVector1...")
-        vectorizer = TfidfVectorizer(lowercase=False, ngram_range=(1,2), max_features=10000, max_df=0.5, min_df=2, use_idf=True)
-        vectorizer.fit(df['question1'].append(df['question2']))
-
-        print("Transform to vector...")
-        df['q1_vect'] = list(vectorizer.transform(df['question1']))
-        df['q2_vect'] = list(vectorizer.transform(df['question2']))
-
-        print("Make cosine similarity...")
-        df['tf_similarity'] = df.apply(cosine_similarity(df['q1_vect'], df['q2_vect'])[0], axis=1)['id']
-        df['tf_similarity2'] = df.apply(cosine_similarity(df['q1_vect2'], df['q2_vect2'])[0], axis=1)['id']
+def make_features(df):
+    print("Preprocessing...")
+    train = parallelize_dataframe(df, preprocessing_test)
     
-    except:
-        print("Error!")
-        df.to_pickle('input/'+name+'.p')
-        return df
+    print("Making word features...")
+    df['len_q1'] = df['question1'].apply(lambda x: len(str(x)))
+    df['len_q2'] = df['question2'].apply(lambda x: len(str(x)))
+    df['len_word_q1'] = df['question1'].apply(lambda x: len(str(x).split()))
+    df['len_word_q2'] = df['question2'].apply(lambda x: len(str(x).split()))
+    df['len_word_q2'] = df['len_word_q2'].fillna(0)
+    df['avg_world_len1'] = df['len_q1'] / df['len_word_q1']
+    df['avg_world_len2'] = df['len_q2'] / df['len_word_q2']
+    train['diff_avg_word'] = df['avg_world_len1'] - df['avg_world_len2']
+    train['word_match'] = df.apply(word_match_share, axis=1, raw=True)    
     
-    print("Save as pickle...")
-    df.to_pickle('input/'+name+'.p')
-    return df
+    print("Making bag of words features...")
+    all_questions = train['question1'].append(train['question2'])
+    tfidf = TfidfVectorizer(lowercase=True, binary=True).fit(all_questions)
+    q1_tfidf1 = tfidf.transform(train['question1'])
+    q2_tfidf1 = tfidf.transform(train['question2'])
+    tfidf = TfidfVectorizer(lowercase=True, binary=True, ngram_range=(1,3), analyzer='word', \
+                            max_features=100000, max_df=0.5, min_df=30, use_idf=True).fit(all_questions)
+    q1_tfidf2 = tfidf.transform(train['question1'])
+    q2_tfidf2 = tfidf.transform(train['question2'])
+    count = CountVectorizer(lowercase=True, binary=True, ngram_range=(1,10), analyzer='char', \
+                            max_features=300000, max_df=0.999, min_df=50).fit(all_questions)
+    q1_count = count.transform(train['question1'])
+    q2_count = count.transform(train['question2'])
+    
+    print("Calculate distances...")
+    train['tf_distance1'] = paired_cosine_distances(q1_tfidf1, q2_tfidf1)
+    train['tf_distance2'] = paired_cosine_distances(q1_tfidf2, q2_tfidf2)
+    train['cnt_distance'] = paired_cosine_distances(q1_count, q2_count)
+    train['jaccard_dist'] = df.apply(lambda x: jaccard_distance(set(str(x.question1).split(' ')), \
+                                                                set(str(x.question2).split(' '))), axis=1)
+    return train
     
