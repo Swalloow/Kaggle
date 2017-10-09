@@ -63,6 +63,20 @@ def feature_reduction(df, fields, label):
     ax.set_zlabel("3rd eigenvector")
     ax.w_zaxis.set_ticklabels([])
 
+# Describe missing values
+def describe_missing_values(df):
+    na_percent = {}
+    N = df.shape[0]
+    for column in df:
+        na_percent[column] = df[column].isnull().sum() * 100 / N
+
+    na_percent = dict(filter(lambda x: x[1] != 0, na_percent.items()))
+    fig = plt.figure(1, figsize=(8, 6))
+    plt.bar(range(len(na_percent)), na_percent.values())
+    plt.ylabel('Percent')
+    plt.xticks(range(len(na_percent)), na_percent.keys(), rotation='vertical')
+    plt.show()
+
 # Confusion matrix with classification score
 def evaluate_models(y, preds):
     print('Accuracy: {}'.format(accuracy_score(y, preds)))
