@@ -1,7 +1,7 @@
 # Kaggle Competition
 Jupyter Notebooks for Kaggle competitions
 
----
+
 ## Kaggle API
 
 Official API for https://www.kaggle.com, accessible using a command line tool implemented in Python.
